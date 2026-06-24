@@ -1,9 +1,14 @@
 from flask import Flask, request, jsonify
 import yt_dlp
-import logging
+import os
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+
+# Cookies file ka content env variable se lo
+cookies_content = os.environ.get('IG_COOKIES', '')
+if cookies_content:
+    with open('/tmp/cookies.txt', 'w') as f:
+        f.write(cookies_content)
 
 @app.route('/api')
 def download():
@@ -16,28 +21,19 @@ def download():
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        'socket_timeout': 30,
+        'cookiefile': '/tmp/cookies.txt' if cookies_content else None,
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            video_url = info.get('url')
-            title = info.get('title', 'No title')
-            
             return jsonify({
                 "status": "success", 
-                "mp4_url": video_url,
-                "title": title,
-                "duration": info.get('duration')
+                "mp4_url": info['url'],
+                "title": info.get('title', '')
             })
     except Exception as e:
-        logging.error(f"Error: {str(e)}")
         return jsonify({"status": "error", "msg": str(e)}), 500
-
-@app.route('/')
-def health():
-    return "yt-dlp API Running ✅"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
